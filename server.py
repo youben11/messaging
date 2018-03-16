@@ -14,9 +14,9 @@ BINDING = (ADDR, PORT)
 
 class DB(object):
     CREATE_TABLE = "CREATE TABLE IF NOT EXISTS USERS(username text PRIMARY KEY, password text);"
-    INSERT_USER = "INSERT INTO USERS VALUES ('%s', '%s')"
-    SELECT_USER = "SELECT * from USERS where username='%s'"
-    SELECT_USER_WITH_PASS = "SELECT * from USERS where username='%s' and password='%s'"
+    INSERT_USER = "INSERT INTO USERS VALUES (?, ?);"
+    SELECT_USER = "SELECT * from USERS where username= ?;"
+    SELECT_USER_WITH_PASS = "SELECT * from USERS where username= ? and password= ?;"
 
     def __init__(self, db_name=DB_NAME):
         self.db_name = db_name
@@ -35,7 +35,7 @@ class DB(object):
         #try to insert the user
         cur = self.conn.cursor()
         try:
-            cur.execute(DB.INSERT_USER % (username, password))
+            cur.execute(DB.INSERT_USER, (username, password))
             self.conn.commit()
             return True
         except sqlite3.IntegrityError as ie: #the user already exists
@@ -48,7 +48,7 @@ class DB(object):
         password = h.hexdigest()
         #try to find the user
         cur = self.conn.cursor()
-        cur.execute(DB.SELECT_USER_WITH_PASS % (username, password))
+        cur.execute(DB.SELECT_USER_WITH_PASS, (username, password))
         if cur.fetchone(): # the user exists
             return True
         else:
