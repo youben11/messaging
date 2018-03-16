@@ -1,12 +1,31 @@
 import socket
 import sqlite3
+import re
+import time
 from threading import Thread
 from Queue import Queue
 from Crypto.Hash import SHA256
 
 MAX_CLIENT = 0 #infinite
-CLIENTS = Queue(MAX_CLIENT) # ("username",socket)
+CLIENTS = Queue(MAX_CLIENT) # username
+CLIENTS_SOCKETS = dict() # "usename": socket
 DB_NAME = "messaging.db"
+
+re_user_password = r"^\w{2,}:\w{8,}$"
+
+SLEEP_T = 0.5 #time to sleep to wait data
+BYTE_R = 1024 #number of byte per recv
+NUM_TH = 2 #number of working threads
+
+DELEM_MSG = '~'
+DELEM_USER_ADD = "+"
+DELEM_USER_LOGIN = "*"
+DELEM_STATUS = "#"
+DELEM_SEND = "@"
+STATUS_ERROR = "%sERROR" % DELEM_STATUS
+STATUS_SUCCESS = "%sSUCCESS" % DELEM_STATUS
+STATUS_USER_EXISTS = "%sUSER_EXISTS" % DELEM_STATUS
+STATUS_WRONG_CREDENTIAL = "%sWRONG_CREDENTIAL" % DELEM_STATUS
 
 ADDR = "0.0.0.0"
 PORT = 4848
@@ -57,12 +76,97 @@ class DB(object):
     def close(self):
         self.conn.close()
 
+def read(sock, ntry):
+    sock.settimeout(SLEEP_T)
+    buf = []
+    found = False
+    while ntry:
+        try:
+            r = sock.recv(BYTE_R)
+            if not len(r):
+                return None #socket closed
+            buf.extend(list(r))
+            found = True
+            continue
+        except socket.timeout as st:
+            if found:
+                return "".join(buf)
+        ntry -= 1
+    return "".join(buf)
+
 def client_handler(client_sock):
-    try:
-        user, password = client_sock.recv(1024).split(' ')
-    except:
-        pass
-    client_sock.close()
+    buf = read(client_sock, 100)
+    if not len(buf):
+        client_sock.close()
+        return None
+    if buf[0] == DELEM_USER_ADD:
+        add_user(client_sock,buf[1:])
+    elif buf[0] == DELEM_USER_LOGIN:
+        login_user(client_sock, buf[1:])
+    else:
+        client_sock.send(STATUS_ERROR)
+        client_sock.close()
+
+def add_user(client_sock, user_pass):
+    if re.match(re_user_password, user_pass):
+        username, password = user_pass.split(":")
+        db = DB()
+        if db.add_user(username, password):
+            client_sock.send(STATUS_SUCCESS)
+            CLIENTS.put(username)
+            CLIENTS_SOCKETS[username] = client_sock
+        else:
+            client_sock.send(STATUS_USER_EXISTS)
+            client_sock.close()
+    else:
+        client_sock.send(STATUS_ERROR)
+        client_sock.close()
+
+def login_user(client_sock, user_pass):
+    if re.match(re_user_password, user_pass):
+        username, password = user_pass.split(":")
+        db = DB()
+        if db.match_user(username, password):
+            client_sock.send(STATUS_SUCCESS)
+            CLIENTS.put(username)
+            CLIENTS_SOCKETS[username] = client_sock
+        else:
+            client_sock.send(STATUS_WRONG_CREDENTIAL)
+            client_sock.close()
+    else:
+        client_sock.send(STATUS_ERROR)
+        client_sock.close()
+
+def server_thread():
+    while True:
+        username = CLIENTS.get()
+        client_sock = CLIENTS_SOCKETS[username]
+        buf = read(client_sock, 1)
+        if buf == None:
+            CLIENTS_SOCKETS.pop(username).close()
+            continue
+        buf = buf.split('~')
+        for msg in buf:
+            if len(msg):
+                time.sleep(SLEEP_T)
+                print "[%d]Message from %s: %s" % (time.time(), \
+                                                    username, \
+                                                    msg)
+                packet_to_send = ("%s%s%s%s%s" % (DELEM_SEND, \
+                                        username, \
+                                        DELEM_MSG, \
+                                        msg, \
+                                        DELEM_MSG))
+                for u in CLIENTS_SOCKETS.keys():
+                    try:
+                        CLIENTS_SOCKETS[u].send(packet_to_send)
+                    except:
+                        CLIENTS_SOCKETS.pop(username).close()
+
+        CLIENTS.put(username)
+        print CLIENTS_SOCKETS
+
+
 
 if __name__ == "__main__":
     #INIT DB
@@ -86,4 +190,6 @@ if __name__ == "__main__":
             th = Thread(target=client_handler, args=(client_sock,))
             th.start()
         except: # keyboard inerrupt or something
+            for s in CLIENTS_SOCKETS.values():
+                s.close()
             server.close()
