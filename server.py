@@ -142,13 +142,12 @@ def server_thread():
         username = CLIENTS.get()
         client_sock = CLIENTS_SOCKETS[username]
         buf = read(client_sock, 1)
-        if buf == None:
+        if buf == None: #socket closed
             CLIENTS_SOCKETS.pop(username).close()
             continue
         buf = buf.split('~')
         for msg in buf:
             if len(msg):
-                time.sleep(SLEEP_T)
                 print "[%d]Message from %s: %s" % (time.time(), \
                                                     username, \
                                                     msg)
@@ -164,8 +163,6 @@ def server_thread():
                         CLIENTS_SOCKETS.pop(username).close()
 
         CLIENTS.put(username)
-        print CLIENTS_SOCKETS
-
 
 
 if __name__ == "__main__":
