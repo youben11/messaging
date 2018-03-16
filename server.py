@@ -2,6 +2,7 @@ import socket
 import sqlite3
 from threading import Thread
 from Queue import Queue
+from Crypto.Hash import SHA256
 
 MAX_CLIENT = 0 #infinite
 CLIENTS = Queue(MAX_CLIENT) # ("username",socket)
@@ -12,23 +13,49 @@ PORT = 4848
 BINDING = (ADDR, PORT)
 
 class DB(object):
-    CREATE_TABLE = "CREATE TABLE IF NOT EXISTS USERS(usernmae text, password text);"
+    CREATE_TABLE = "CREATE TABLE IF NOT EXISTS USERS(username text PRIMARY KEY, password text);"
+    INSERT_USER = "INSERT INTO USERS VALUES ('%s', '%s')"
+    SELECT_USER = "SELECT * from USERS where username='%s'"
+    SELECT_USER_WITH_PASS = "SELECT * from USERS where username='%s' and password='%s'"
+
     def __init__(self, db_name=DB_NAME):
         self.db_name = db_name
         self.conn = sqlite3.connect(self.db_name)
+
     def init_db(self):
-        cur = conn.cursor()
-        cur.execute(CREATE_TABLE)
-        conn.commit()
+        cur = self.conn.cursor()
+        cur.execute(DB.CREATE_TABLE)
+        self.conn.commit()
 
     def add_user(self, username, password):
-        pass
+        #hashing the password
+        h = SHA256.new()
+        h.update(password)
+        password = h.hexdigest()
+        #try to insert the user
+        cur = self.conn.cursor()
+        try:
+            cur.execute(DB.INSERT_USER % (username, password))
+            self.conn.commit()
+            return True
+        except sqlite3.IntegrityError as ie: #the user already exists
+            return False
 
-    def find_user(self, username, password):
-        pass
+    def match_user(self, username, password):
+        #hashing the password
+        h = SHA256.new()
+        h.update(password)
+        password = h.hexdigest()
+        #try to find the user
+        cur = self.conn.cursor()
+        cur.execute(DB.SELECT_USER_WITH_PASS % (username, password))
+        if cur.fetchone(): # the user exists
+            return True
+        else:
+            return False
 
     def close(self):
-        pass
+        self.conn.close()
 
 def client_handler(client_sock):
     try:
