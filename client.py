@@ -59,8 +59,8 @@ def receiver(sock):
             if not TH_FLAGS[RECEIVER]:
                 exit()
             continue
-
-        print "[%d]%s" % (time.time(), buf)
+        sender, message = re.findall(r'@(\w+)~([^~]+)~', buf)[0]
+        print "[%s] %s: %s" % (time.asctime().split()[3], sender, message)
 
 def connect(sock, username, password):
     sock.send("%s%s:%s" % (DELEM_USER_LOGIN, username, password))
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     if argv[1] == CMD_CONNECT:
         connect(sock, username, password)
     elif argv[1] == CMD_CREATE:
-        create(sock, username, password)
+        create_user(sock, username, password)
     else:
         print HELP % (argv[0], argv[0])
         exit()
