@@ -1,6 +1,7 @@
 import socket
 import time
 import re
+import signal
 from sys import argv, exit
 from threading import Thread
 
@@ -29,15 +30,36 @@ STATUS_SUCCESS = "%sSUCCESS" % DELEM_STATUS
 STATUS_USER_EXISTS = "%sUSER_EXISTS" % DELEM_STATUS
 STATUS_WRONG_CREDENTIAL = "%sWRONG_CREDENTIAL" % DELEM_STATUS
 
+TH_FLAGS = [1,1]
+SENDER = 0
+RECEIVER = 1
+
 def sender(sock):
     while True:
-        buf = raw_input()
-        buf.replace("~","&(tilde)")
-        sock.send("%s%s%s" % (DELEM_MSG, buf, DELEM_MSG))
+        try:
+            buf = raw_input()
+            buf.replace("~","&(tilde)")
+            sock.send("%s%s%s" % (DELEM_MSG, buf, DELEM_MSG))
+            if not TH_FLAGS[SENDER]:
+                exit()
+        except KeyboardInterrupt:
+            exit()
 
 def receiver(sock):
     while True:
-        buf = sock.recv(4096)
+        sock.settimeout(0.5)
+        try:
+            buf = sock.recv(4096)
+            if not len(buf):
+                print "[-] Connection lost..."
+                print "[-] Exiting."
+                TH_FLAGS[SENDER] = 0
+                exit()
+        except socket.timeout as st:
+            if not TH_FLAGS[RECEIVER]:
+                exit()
+            continue
+
         print "[%d]%s" % (time.time(), buf)
 
 def connect(sock, username, password):
@@ -77,7 +99,7 @@ if __name__ == "__main__":
     if len(argv) == 5:
         host = argv[4], DEFAULT_PORT
     else:
-        host = argv[4:]
+        host = argv[4], int(argv[5])
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect(host)
@@ -92,3 +114,13 @@ if __name__ == "__main__":
     rth = Thread(target=receiver, args=(sock,))
     sth.start()
     rth.start()
+    try:
+        while True:
+            signal.pause()
+    except KeyboardInterrupt:
+        TH_FLAGS[SENDER] = 0
+        TH_FLAGS[RECEIVER] = 0
+        rth.join()
+        print "[*] Press Enter to exit..."
+        sth.join()
+        exit()
