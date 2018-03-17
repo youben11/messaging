@@ -1,17 +1,14 @@
 import socket
-import sqlite3
 import re
 import time
 from threading import Thread
 from Queue import Queue
-from Crypto.Hash import SHA256
+from DB import *
+from messaging_proto import *
 
 MAX_CLIENT = 0 #infinite
 CLIENTS = Queue(MAX_CLIENT) # username
 CLIENTS_SOCKETS = dict() # "usename": socket
-DB_NAME = "messaging.db"
-
-re_user_password = r"^[a-zA-Z]\w{1,19}:\S{8,15}$"
 
 SLEEP_T = 0.5 #time to sleep to wait data
 BYTE_R = 1024 #number of byte per recv
@@ -19,64 +16,11 @@ NUM_TH = 2 #number of working threads
 TH_FLAGS = [1 for i in range(NUM_TH)]
 TH_END = "##END##"
 
-DELEM_MSG = '~'
-DELEM_USER_ADD = "+"
-DELEM_USER_LOGIN = "*"
-DELEM_STATUS = "#"
-DELEM_SEND = "@"
-STATUS_ERROR = "%sERROR" % DELEM_STATUS
-STATUS_SUCCESS = "%sSUCCESS" % DELEM_STATUS
-STATUS_USER_EXISTS = "%sUSER_EXISTS" % DELEM_STATUS
-STATUS_WRONG_CREDENTIAL = "%sWRONG_CREDENTIAL" % DELEM_STATUS
-
 ADDR = "0.0.0.0"
 PORT = 4848
 BINDING = (ADDR, PORT)
 
-class DB(object):
-    CREATE_TABLE = "CREATE TABLE IF NOT EXISTS USERS(username text PRIMARY KEY, password text);"
-    INSERT_USER = "INSERT INTO USERS VALUES (?, ?);"
-    SELECT_USER = "SELECT * from USERS where username= ?;"
-    SELECT_USER_WITH_PASS = "SELECT * from USERS where username= ? and password= ?;"
 
-    def __init__(self, db_name=DB_NAME):
-        self.db_name = db_name
-        self.conn = sqlite3.connect(self.db_name)
-
-    def init_db(self):
-        cur = self.conn.cursor()
-        cur.execute(DB.CREATE_TABLE)
-        self.conn.commit()
-
-    def add_user(self, username, password):
-        #hashing the password
-        h = SHA256.new()
-        h.update(password)
-        password = h.hexdigest()
-        #try to insert the user
-        cur = self.conn.cursor()
-        try:
-            cur.execute(DB.INSERT_USER, (username, password))
-            self.conn.commit()
-            return True
-        except sqlite3.IntegrityError as ie: #the user already exists
-            return False
-
-    def match_user(self, username, password):
-        #hashing the password
-        h = SHA256.new()
-        h.update(password)
-        password = h.hexdigest()
-        #try to find the user
-        cur = self.conn.cursor()
-        cur.execute(DB.SELECT_USER_WITH_PASS, (username, password))
-        if cur.fetchone(): # the user exists
-            return True
-        else:
-            return False
-
-    def close(self):
-        self.conn.close()
 
 def read(sock, ntry):
     sock.settimeout(SLEEP_T)
@@ -152,7 +96,9 @@ def server_thread(th_num):
         try:
             client_sock = CLIENTS_SOCKETS[username]
         except:
-            continue
+            if username == TH_END:
+                CLIENTS.put(TH_END)
+                continue
         buf = read(client_sock, 1)
         if buf == None: #socket closed
             CLIENTS_SOCKETS.pop(username).close()
@@ -200,10 +146,9 @@ if __name__ == "__main__":
         except socket.error:
             continue
         except KeyboardInterrupt:
-            server.close()
+            CLIENTS.put(TH_END)
             for i in range(NUM_TH): #signal to threads to end
                 TH_FLAGS[i] = 0
-                CLIENTS.put(TH_END)
                 server_ths[i].join()
             for s in CLIENTS_SOCKETS.values():
                 try:
@@ -211,4 +156,5 @@ if __name__ == "__main__":
                 except:
                     pass
             print "[*] Server Stopped."
+            server.close()
             exit()

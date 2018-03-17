@@ -4,6 +4,7 @@ import re
 import signal
 from sys import argv
 from threading import Thread
+from messaging_proto import *
 
 DEFAULT_PORT = 4848
 HELP = """[+] Usage:
@@ -14,21 +15,10 @@ HELP = """[+] Usage:
 [*] password: 8 to 15 characters
 """
 
-re_user_password = r"^[a-zA-Z]\w{1,19}:\S{8,15}$"
 re_cmd = r"^(connect|create) [a-zA-Z]\w{1,19} \S{8,15} ((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9|1[0-9]{2}|[1-9]?[0-9])( \d+)?$"
 
 CMD_CONNECT = "connect"
 CMD_CREATE = "create"
-
-DELEM_MSG = '~'
-DELEM_USER_ADD = "+"
-DELEM_USER_LOGIN = "*"
-DELEM_STATUS = "#"
-DELEM_SEND = "@"
-STATUS_ERROR = "%sERROR" % DELEM_STATUS
-STATUS_SUCCESS = "%sSUCCESS" % DELEM_STATUS
-STATUS_USER_EXISTS = "%sUSER_EXISTS" % DELEM_STATUS
-STATUS_WRONG_CREDENTIAL = "%sWRONG_CREDENTIAL" % DELEM_STATUS
 
 TH_FLAGS = [1,1]
 SENDER = 0
