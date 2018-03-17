@@ -1,12 +1,23 @@
 import socket
 import time
+import re
+from sys import argv, exit
 from threading import Thread
 
-ADDR = "127.0.0.1"
-PORT = 4848
-HOST = (ADDR, PORT)
-USERNAME = "youben"
-PASSWORD = "123456789"
+DEFAULT_PORT = 4848
+HELP = """[+] Usage:
+            %s connect username password server_ip [server_port]
+            %s create username password server_ip [server_port]
+
+[*] usernmae: alphanumeric, 2 to 20 character (must begin with a letter)
+[*] password: 8 to 15 characters
+"""
+
+re_user_password = r"^[a-zA-Z]\w{1,19}:\S{8,15}$"
+re_cmd = r"^(connect|create) [a-zA-Z]\w{1,19} \S{8,15} ((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9|1[0-9]{2}|[1-9]?[0-9])( \d+)?$"
+
+CMD_CONNECT = "connect"
+CMD_CREATE = "create"
 
 DELEM_MSG = '~'
 DELEM_USER_ADD = "+"
@@ -21,6 +32,7 @@ STATUS_WRONG_CREDENTIAL = "%sWRONG_CREDENTIAL" % DELEM_STATUS
 def sender(sock):
     while True:
         buf = raw_input()
+        buf.replace("~","&(tilde)")
         sock.send("%s%s%s" % (DELEM_MSG, buf, DELEM_MSG))
 
 def receiver(sock):
@@ -32,7 +44,7 @@ def connect(sock, username, password):
     sock.send("%s%s:%s" % (DELEM_USER_LOGIN, username, password))
     buf = sock.recv(1024)
     if buf.startswith(STATUS_SUCCESS):
-        print "[+] Successfully connected"
+        print "[+] Successfully connected as %s" % username
         return True
     elif buf.startswith(STATUS_WRONG_CREDENTIAL):
         print "[-] Wrong Credentail"
@@ -55,9 +67,27 @@ def create_user(sock, usernmae, password):
         return False
 
 if __name__ == "__main__":
+    if len(argv) not in [5,6]:
+        print HELP % (argv[0], argv[0])
+        exit()
+    if not re.match(re_cmd, " ".join(argv[1:])):
+        print HELP % (argv[0], argv[0])
+        exit()
+    username, password = argv[2:4]
+    if len(argv) == 5:
+        host = argv[4], DEFAULT_PORT
+    else:
+        host = argv[4:]
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(HOST)
-    connect(sock, USERNAME, PASSWORD)
+    sock.connect(host)
+    if argv[1] == CMD_CONNECT:
+        connect(sock, username, password)
+    elif argv[1] == CMD_CREATE:
+        create(sock, username, password)
+    else:
+        print HELP % (argv[0], argv[0])
+        exit()
     sth = Thread(target=sender, args=(sock,))
     rth = Thread(target=receiver, args=(sock,))
     sth.start()

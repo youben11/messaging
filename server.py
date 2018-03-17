@@ -11,7 +11,7 @@ CLIENTS = Queue(MAX_CLIENT) # username
 CLIENTS_SOCKETS = dict() # "usename": socket
 DB_NAME = "messaging.db"
 
-re_user_password = r"^\w{2,}:\w{8,}$"
+re_user_password = r"^[a-zA-Z]\w{1,19}:\S{8,15}$"
 
 SLEEP_T = 0.5 #time to sleep to wait data
 BYTE_R = 1024 #number of byte per recv
@@ -96,6 +96,9 @@ def read(sock, ntry):
 
 def client_handler(client_sock):
     buf = read(client_sock, 100)
+    if buf == None: #socket closed
+        client_sock.close()
+        return None
     if not len(buf):
         client_sock.close()
         return None
@@ -152,16 +155,15 @@ def server_thread():
                                                     username, \
                                                     msg)
                 packet_to_send = ("%s%s%s%s%s" % (DELEM_SEND, \
-                                        username, \
-                                        DELEM_MSG, \
-                                        msg, \
-                                        DELEM_MSG))
+                                                    username, \
+                                                    DELEM_MSG, \
+                                                    msg, \
+                                                    DELEM_MSG))
                 for u in CLIENTS_SOCKETS.keys():
                     try:
                         CLIENTS_SOCKETS[u].send(packet_to_send)
                     except:
                         CLIENTS_SOCKETS.pop(username).close()
-
         CLIENTS.put(username)
 
 
