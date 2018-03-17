@@ -61,6 +61,7 @@ def add_user(client_sock, user_pass):
         db = DB()
         if db.add_user(username, password):
             client_sock.send(STATUS_SUCCESS)
+            print "[+] User %s created from %s:%d" % ((username,) + client_sock.getpeername())
             CLIENTS.put(username)
             CLIENTS_SOCKETS[username] = client_sock
         else:

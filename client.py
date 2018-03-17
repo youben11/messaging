@@ -15,7 +15,7 @@ HELP = """[+] Usage:
 [*] password: 8 to 15 characters
 """
 
-re_cmd = r"^(connect|create) [a-zA-Z]\w{1,19} \S{8,15} ((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9|1[0-9]{2}|[1-9]?[0-9])( \d+)?$"
+re_cmd = r"^(connect|create) [a-zA-Z]\w{1,19} \S{8,15} ((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])( \d+)?$"
 
 CMD_CONNECT = "connect"
 CMD_CREATE = "create"
@@ -26,11 +26,12 @@ RECEIVER = 1
 
 DEFAULT_PORT = 4848
 
+
 def sender(sock):
     while True:
         try:
             buf = raw_input()
-            buf.replace("~","&(tilde)")
+            buf = buf.replace("~","&(tilde)")
             if not TH_FLAGS[SENDER]:
                 exit()
             sock.send("%s%s%s" % (DELEM_MSG, buf, DELEM_MSG))
@@ -57,6 +58,7 @@ def receiver(sock):
             continue
         messages = re.findall(r'@(\w+)~([^~]+)~', buf)
         for sender, message in messages:
+            message = message.replace("&(tilde)","~")
             print "[%s] %s: %s" % (time.asctime().split()[3], sender, message)
 
 def connect(sock, username, password):
