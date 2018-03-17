@@ -6,7 +6,7 @@ from sys import argv
 from threading import Thread
 from messaging_proto import *
 
-DEFAULT_PORT = 4848
+
 HELP = """[+] Usage:
             %s connect username password server_ip [server_port]
             %s create username password server_ip [server_port]
@@ -23,6 +23,8 @@ CMD_CREATE = "create"
 TH_FLAGS = [1,1]
 SENDER = 0
 RECEIVER = 1
+
+DEFAULT_PORT = 4848
 
 def sender(sock):
     while True:
@@ -115,6 +117,7 @@ if __name__ == "__main__":
         while True:
             signal.pause()
     except KeyboardInterrupt:
+        sock.shutdown(socket.SHUT_RDWR)
         TH_FLAGS[SENDER] = 0
         TH_FLAGS[RECEIVER] = 0
         rth.join()

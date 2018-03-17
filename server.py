@@ -21,7 +21,6 @@ PORT = 4848
 BINDING = (ADDR, PORT)
 
 
-
 def read(sock, ntry):
     sock.settimeout(SLEEP_T)
     buf = []
@@ -43,10 +42,10 @@ def read(sock, ntry):
 def client_handler(client_sock):
     buf = read(client_sock, 100)
     if buf == None: #socket closed
-        client_sock.close()
+        client_sock.shutdown(socket.SHUT_RDWR)
         return None
     if not len(buf):
-        client_sock.close()
+        client_sock.shutdown(socket.SHUT_RDWR)
         return None
     if buf[0] == DELEM_USER_ADD:
         add_user(client_sock,buf[1:])
@@ -54,7 +53,7 @@ def client_handler(client_sock):
         login_user(client_sock, buf[1:])
     else:
         client_sock.send(STATUS_ERROR)
-        client_sock.close()
+        client_sock.shutdown(socket.SHUT_RDWR)
 
 def add_user(client_sock, user_pass):
     if re.match(re_user_password, user_pass):
@@ -66,10 +65,10 @@ def add_user(client_sock, user_pass):
             CLIENTS_SOCKETS[username] = client_sock
         else:
             client_sock.send(STATUS_USER_EXISTS)
-            client_sock.close()
+            client_sock.shutdown(socket.SHUT_RDWR)
     else:
         client_sock.send(STATUS_ERROR)
-        client_sock.close()
+        client_sock.shutdown(socket.SHUT_RDWR)
 
 def login_user(client_sock, user_pass):
     if re.match(re_user_password, user_pass):
@@ -82,10 +81,10 @@ def login_user(client_sock, user_pass):
             CLIENTS_SOCKETS[username] = client_sock
         else:
             client_sock.send(STATUS_WRONG_CREDENTIAL)
-            client_sock.close()
+            client_sock.shutdown(socket.SHUT_RDWR)
     else:
         client_sock.send(STATUS_ERROR)
-        client_sock.close()
+        client_sock.shutdown(socket.SHUT_RDWR)
 
 def server_thread(th_num):
     while True:
@@ -101,7 +100,7 @@ def server_thread(th_num):
                 continue
         buf = read(client_sock, 1)
         if buf == None: #socket closed
-            CLIENTS_SOCKETS.pop(username).close()
+            CLIENTS_SOCKETS.pop(username).shutdown(socket.SHUT_RDWR)
             continue
         buf = buf.split('~')
         for msg in buf:
@@ -118,7 +117,7 @@ def server_thread(th_num):
                     try:
                         CLIENTS_SOCKETS[u].send(packet_to_send)
                     except:
-                        CLIENTS_SOCKETS.pop(username).close()
+                        CLIENTS_SOCKETS.pop(username).shutdown(socket.SHUT_RDWR)
         CLIENTS.put(username)
 
 
@@ -152,9 +151,9 @@ if __name__ == "__main__":
                 server_ths[i].join()
             for s in CLIENTS_SOCKETS.values():
                 try:
-                    s.close()
+                    s.shutdown(socket.SHUT_RDWR)
                 except:
                     pass
             print "[*] Server Stopped."
-            server.close()
+            server.shutdown(socket.SHUT_RDWR)
             exit()
