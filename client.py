@@ -2,7 +2,7 @@ import socket
 import time
 import re
 import signal
-from sys import argv, exit
+from sys import argv
 from threading import Thread
 
 DEFAULT_PORT = 4848
@@ -39,9 +39,13 @@ def sender(sock):
         try:
             buf = raw_input()
             buf.replace("~","&(tilde)")
-            sock.send("%s%s%s" % (DELEM_MSG, buf, DELEM_MSG))
             if not TH_FLAGS[SENDER]:
                 exit()
+            sock.send("%s%s%s" % (DELEM_MSG, buf, DELEM_MSG))
+        except socket.error:
+            print "[-] Connection lost..."
+            print "[*] Sender Stopped."
+            exit()
         except KeyboardInterrupt:
             exit()
 
@@ -52,15 +56,16 @@ def receiver(sock):
             buf = sock.recv(4096)
             if not len(buf):
                 print "[-] Connection lost..."
-                print "[-] Exiting."
+                print "[*] Receiver Stopped."
                 TH_FLAGS[SENDER] = 0
                 exit()
         except socket.timeout as st:
             if not TH_FLAGS[RECEIVER]:
                 exit()
             continue
-        sender, message = re.findall(r'@(\w+)~([^~]+)~', buf)[0]
-        print "[%s] %s: %s" % (time.asctime().split()[3], sender, message)
+        messages = re.findall(r'@(\w+)~([^~]+)~', buf)
+        for sender, message in messages:
+            print "[%s] %s: %s" % (time.asctime().split()[3], sender, message)
 
 def connect(sock, username, password):
     sock.send("%s%s:%s" % (DELEM_USER_LOGIN, username, password))
@@ -104,9 +109,11 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect(host)
     if argv[1] == CMD_CONNECT:
-        connect(sock, username, password)
+        if not connect(sock, username, password):
+            exit()
     elif argv[1] == CMD_CREATE:
-        create_user(sock, username, password)
+        if not create_user(sock, username, password):
+            exit()
     else:
         print HELP % (argv[0], argv[0])
         exit()

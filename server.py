@@ -16,6 +16,8 @@ re_user_password = r"^[a-zA-Z]\w{1,19}:\S{8,15}$"
 SLEEP_T = 0.5 #time to sleep to wait data
 BYTE_R = 1024 #number of byte per recv
 NUM_TH = 2 #number of working threads
+TH_FLAGS = [1 for i in range(NUM_TH)]
+TH_END = "##END##"
 
 DELEM_MSG = '~'
 DELEM_USER_ADD = "+"
@@ -131,6 +133,7 @@ def login_user(client_sock, user_pass):
         db = DB()
         if db.match_user(username, password):
             client_sock.send(STATUS_SUCCESS)
+            print "[+] User %s is on %s:%d" % ((username,) + client_sock.getpeername())
             CLIENTS.put(username)
             CLIENTS_SOCKETS[username] = client_sock
         else:
@@ -140,10 +143,16 @@ def login_user(client_sock, user_pass):
         client_sock.send(STATUS_ERROR)
         client_sock.close()
 
-def server_thread():
+def server_thread(th_num):
     while True:
+        if not TH_FLAGS[th_num]:
+            print "[*] Thread%d ending..." % (th_num + 1)
+            exit()
         username = CLIENTS.get()
-        client_sock = CLIENTS_SOCKETS[username]
+        try:
+            client_sock = CLIENTS_SOCKETS[username]
+        except:
+            continue
         buf = read(client_sock, 1)
         if buf == None: #socket closed
             CLIENTS_SOCKETS.pop(username).close()
@@ -151,7 +160,7 @@ def server_thread():
         buf = buf.split('~')
         for msg in buf:
             if len(msg):
-                print "[%d]Message from %s: %s" % (time.time(), \
+                print "[%d] Message from %s: %s" % (time.time(), \
                                                     username, \
                                                     msg)
                 packet_to_send = ("%s%s%s%s%s" % (DELEM_SEND, \
@@ -176,7 +185,7 @@ if __name__ == "__main__":
     server.bind(BINDING)
     server.listen(5)
     #Create threads to handle incoming messages
-    server_ths = [Thread(target=server_thread) for i in range(NUM_TH)]
+    server_ths = [Thread(target=server_thread, args=(i,)) for i in range(NUM_TH)]
     for th in server_ths:
         th.start()
 
@@ -188,7 +197,18 @@ if __name__ == "__main__":
             print "[+] Connection From %s:%d" % client_addr
             th = Thread(target=client_handler, args=(client_sock,))
             th.start()
-        except: # keyboard inerrupt or something
-            for s in CLIENTS_SOCKETS.values():
-                s.close()
+        except socket.error:
+            continue
+        except KeyboardInterrupt:
             server.close()
+            for i in range(NUM_TH): #signal to threads to end
+                TH_FLAGS[i] = 0
+                CLIENTS.put(TH_END)
+                server_ths[i].join()
+            for s in CLIENTS_SOCKETS.values():
+                try:
+                    s.close()
+                except:
+                    pass
+            print "[*] Server Stopped."
+            exit()
