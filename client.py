@@ -2,10 +2,12 @@ import socket
 import time
 import re
 import signal
+import curses
 from sys import argv
 from threading import Thread
 from messaging_proto import *
 from Queue import Queue
+from string import printable
 
 
 HELP = """[+] Usage:
@@ -93,6 +95,61 @@ def create_user(sock, usernmae, password):
         print "[-] Error"
         return False
 
+def start_curses(screen):
+    screen.clear()
+    screen.refresh()
+    buf = list()
+    x = 0
+    y = 0
+    key = 0
+
+    while key != curses.KEY_F1:
+        try:
+            screen.clear()
+            height, width = screen.getmaxyx()
+
+            if key == curses.KEY_DOWN:
+                y = y + 1
+            elif key == curses.KEY_UP:
+                y = y - 1
+            elif key == curses.KEY_RIGHT:
+                x = x + 1
+            elif key == curses.KEY_LEFT:
+                x = x - 1
+            elif key == 127 and len(buf): #DELETE
+                buf.pop()
+            elif key == 10: #ENTER
+                MSG_Q.put("".join(buf))
+                buf = []
+                key = 0
+
+            try:
+                c = chr(key)
+                if c in printable:
+                    buf.append(c)
+            except:
+                pass
+
+            #x and y must be in their allowed range
+            x = max(0, x)
+            x = min(width - 1, x)
+            y = max(0, y)
+            y = min(width - 1, y)
+
+            #strings
+            str_status = "Exit: F1 | Send: Enter"[:width-1]
+            str_msg = ("message: %s" % "".join(buf))[:width-1]
+
+            #displaying
+            screen.addstr(height-1, 0, str_status)
+            screen.addstr(height-2, 0, str_msg)
+
+            key = screen.getch()
+
+        except KeyboardInterrupt:
+            return None
+
+
 if __name__ == "__main__":
     if len(argv) not in [5,6]:
         print HELP % (argv[0], argv[0])
@@ -121,16 +178,13 @@ if __name__ == "__main__":
     rth = Thread(target=receiver, args=(sock,))
     sth.start()
     rth.start()
-    #call a draw() func and exit only when it returns
-    try:
-        while True:
-            buf = raw_input()
-            MSG_Q.put(buf)
-    except KeyboardInterrupt:
-        sock.shutdown(socket.SHUT_RDWR)
-        TH_FLAGS[SENDER] = 0
-        TH_FLAGS[RECEIVER] = 0
-        MSG_Q.put(MSG_END) #deblock the sender
-        rth.join()
-        sth.join()
-        exit()
+    #start the gui
+    curses.wrapper(start_curses)
+    #the client will shut down
+    sock.shutdown(socket.SHUT_RDWR)
+    TH_FLAGS[SENDER] = 0
+    TH_FLAGS[RECEIVER] = 0
+    MSG_Q.put(MSG_END) #deblock the sender
+    rth.join()
+    sth.join()
+    exit()
