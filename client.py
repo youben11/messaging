@@ -50,6 +50,8 @@ def receiver(sock):
         sock.settimeout(0.5)
         try:
             buf = sock.recv(4096)
+            if not TH_FLAGS[RECEIVER]:
+                exit()
             if not len(buf):
                 print "[-] Connection lost..."
                 print "[*] Receiver Stopped."
@@ -128,7 +130,7 @@ if __name__ == "__main__":
         sock.shutdown(socket.SHUT_RDWR)
         TH_FLAGS[SENDER] = 0
         TH_FLAGS[RECEIVER] = 0
-        rth.join()
         MSG_Q.put(MSG_END) #deblock the sender
+        rth.join()
         sth.join()
         exit()
