@@ -5,6 +5,7 @@ import signal
 from sys import argv
 from threading import Thread
 from messaging_proto import *
+from Queue import Queue
 
 
 HELP = """[+] Usage:
@@ -23,18 +24,20 @@ CMD_CREATE = "create"
 TH_FLAGS = [1,1]
 SENDER = 0
 RECEIVER = 1
+MSG_Q = Queue()
+MSG_END = "#END#"
 
 DEFAULT_PORT = 4848
-
 
 def sender(sock):
     while True:
         try:
-            buf = raw_input()
-            buf = buf.replace("~","&(tilde)")
+            # get msg from a queue instead of stdin
+            msg = MSG_Q.get()
             if not TH_FLAGS[SENDER]:
                 exit()
-            sock.send("%s%s%s" % (DELEM_MSG, buf, DELEM_MSG))
+            msg = msg.replace("~","&(tilde)")
+            sock.send("%s%s%s" % (DELEM_MSG, msg, DELEM_MSG))
         except socket.error:
             print "[-] Connection lost..."
             print "[*] Sender Stopped."
@@ -59,6 +62,7 @@ def receiver(sock):
         messages = re.findall(r'@(\w+)~([^~]+)~', buf)
         for sender, message in messages:
             message = message.replace("&(tilde)","~")
+            #print it using a curse func
             print "[%s] %s: %s" % (time.asctime().split()[3], sender, message)
 
 def connect(sock, username, password):
@@ -115,14 +119,16 @@ if __name__ == "__main__":
     rth = Thread(target=receiver, args=(sock,))
     sth.start()
     rth.start()
+    #call a draw() func and exit only when it returns
     try:
         while True:
-            signal.pause()
+            buf = raw_input()
+            MSG_Q.put(buf)
     except KeyboardInterrupt:
         sock.shutdown(socket.SHUT_RDWR)
         TH_FLAGS[SENDER] = 0
         TH_FLAGS[RECEIVER] = 0
         rth.join()
-        print "[*] Press Enter to exit..."
+        MSG_Q.put(MSG_END) #deblock the sender
         sth.join()
         exit()
