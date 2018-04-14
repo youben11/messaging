@@ -23,26 +23,29 @@ re_cmd = r"^(connect|create) [a-zA-Z]\w{1,19} \S{8,15} ((25[0-5]|2[0-4][0-9]|1[0
 CMD_CONNECT = "connect"
 CMD_CREATE = "create"
 
-TH_FLAGS = [1,1]
+TH_FLAGS = [1,1,1]
 SENDER = 0
 RECEIVER = 1
-MSG_Q = Queue()
+MAIN = 2
+#Message Queue Sender
+MSG_Q_S = Queue()
 MSG_END = "#END#"
+#Message List Receiver
+MSG_R = []
 
 DEFAULT_PORT = 4848
 
 def sender(sock):
     while True:
         try:
-            # get msg from a queue instead of stdin
-            msg = MSG_Q.get()
+            msg = MSG_Q_S.get()
             if not TH_FLAGS[SENDER]:
                 exit()
             msg = msg.replace("~","&(tilde)")
             sock.send("%s%s%s" % (DELEM_MSG, msg, DELEM_MSG))
         except socket.error:
-            print "[-] Connection lost..."
-            print "[*] Sender Stopped."
+            TH_FLAGS[RECEIVER] = 0
+            TH_FLAGS[MAIN] = 0
             exit()
         except KeyboardInterrupt:
             exit()
@@ -55,9 +58,8 @@ def receiver(sock):
             if not TH_FLAGS[RECEIVER]:
                 exit()
             if not len(buf):
-                print "[-] Connection lost..."
-                print "[*] Receiver Stopped."
                 TH_FLAGS[SENDER] = 0
+                TH_FLAGS[MAIN] = 0
                 exit()
         except socket.timeout as st:
             if not TH_FLAGS[RECEIVER]:
@@ -66,8 +68,7 @@ def receiver(sock):
         messages = re.findall(r'@(\w+)~([^~]+)~', buf)
         for sender, message in messages:
             message = message.replace("&(tilde)","~")
-            #print it using a curse func
-            print "[%s] %s: %s" % (time.asctime().split()[3], sender, message)
+            MSG_R.append((time.asctime().split()[3], sender, message))
 
 def connect(sock, username, password):
     sock.send("%s%s:%s" % (DELEM_USER_LOGIN, username, password))
@@ -98,6 +99,8 @@ def create_user(sock, usernmae, password):
 def start_curses(screen):
     screen.clear()
     screen.refresh()
+    screen.timeout(1)
+    curses.curs_set(0)
     buf = list()
     x = 0
     y = 0
@@ -105,7 +108,14 @@ def start_curses(screen):
 
     while key != curses.KEY_F1:
         try:
-            screen.clear()
+            if not TH_FLAGS[MAIN]:
+                #red color here
+                screen.addstr(height-1,0, "Connection Lost... Press something to exit")
+                screen.timeout(-1)
+                screen.getch()
+                return None
+
+            screen.refresh()
             height, width = screen.getmaxyx()
 
             if key == curses.KEY_DOWN:
@@ -119,7 +129,7 @@ def start_curses(screen):
             elif key == 127 and len(buf): #DELETE
                 buf.pop()
             elif key == 10: #ENTER
-                MSG_Q.put("".join(buf))
+                MSG_Q_S.put("".join(buf))
                 buf = []
                 key = 0
 
@@ -139,8 +149,10 @@ def start_curses(screen):
             #strings
             str_status = "Exit: F1 | Send: Enter"[:width-1]
             str_msg = ("message: %s" % "".join(buf))[:width-1]
+            str_msg = str_msg + " " * (width - 1 - len(str_msg))
 
             #displaying
+            display_msgs(screen, height, width)
             screen.addstr(height-1, 0, str_status)
             screen.addstr(height-2, 0, str_msg)
 
@@ -148,6 +160,11 @@ def start_curses(screen):
 
         except KeyboardInterrupt:
             return None
+
+def display_msgs(screen, height, width):
+    #manage size
+    messages = ["[%s] %s: %s" % m for m in MSG_R]
+    screen.addstr(0,0, "\n".join(messages))
 
 
 if __name__ == "__main__":
@@ -184,7 +201,7 @@ if __name__ == "__main__":
     sock.shutdown(socket.SHUT_RDWR)
     TH_FLAGS[SENDER] = 0
     TH_FLAGS[RECEIVER] = 0
-    MSG_Q.put(MSG_END) #deblock the sender
+    MSG_Q_S.put(MSG_END) #deblock the sender
     rth.join()
     sth.join()
     exit()
