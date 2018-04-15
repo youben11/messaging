@@ -101,7 +101,10 @@ def server_thread(th_num):
                 continue
         buf = read(client_sock, 1)
         if buf == None: #socket closed
-            CLIENTS_SOCKETS.pop(username).shutdown(socket.SHUT_RDWR)
+            try:
+                CLIENTS_SOCKETS.pop(username).shutdown(socket.SHUT_RDWR)
+            except:
+                pass
             continue
         buf = buf.split('~')
         for msg in buf:
