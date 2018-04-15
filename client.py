@@ -35,6 +35,11 @@ MSG_R = []
 
 DEFAULT_PORT = 4848
 
+COLOR_WARNING = 1
+COLOR_USERNAME = 2
+COLOR_STATUS = 3
+COLOR_MSG = 4
+
 def sender(sock):
     while True:
         try:
@@ -106,11 +111,21 @@ def start_curses(screen):
     y = 0
     key = 0
 
+    #colors
+    curses.start_color()
+    curses.init_pair(COLOR_WARNING, curses.COLOR_WHITE, curses.COLOR_RED)
+    curses.init_pair(COLOR_USERNAME, curses.COLOR_CYAN, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_STATUS, curses.COLOR_BLACK, curses.COLOR_WHITE)
+    curses.init_pair(COLOR_MSG, curses.COLOR_BLACK, curses.COLOR_CYAN)
+
     while key != curses.KEY_F1:
         try:
             if not TH_FLAGS[MAIN]:
-                #red color here
-                screen.addstr(height-1,0, "Connection Lost... Press something to exit")
+                str_warning = "Connection Lost... Press something to exit"[:width-1]
+                str_warning += " " * (width - 1 - len(str_warning))
+                screen.attron(curses.color_pair(COLOR_WARNING))
+                screen.addstr(height-1,0, str_warning)
+                screen.attroff(curses.color_pair(COLOR_WARNING))
                 screen.timeout(-1)
                 screen.getch()
                 return None
@@ -148,13 +163,20 @@ def start_curses(screen):
 
             #strings
             str_status = "Exit: F1 | Send: Enter"[:width-1]
+            str_status += " " * (width - 1 - len(str_status))
             str_msg = ("message: %s" % "".join(buf))[:width-1]
-            str_msg = str_msg + " " * (width - 1 - len(str_msg))
+            str_msg += " " * (width - 1 - len(str_msg))
 
             #displaying
             display_msgs(screen, height - 2, width)
+
+            screen.attron(curses.color_pair(COLOR_STATUS))
             screen.addstr(height-1, 0, str_status)
+            screen.attroff(curses.color_pair(COLOR_STATUS))
+
+            screen.attron(curses.color_pair(COLOR_MSG))
             screen.addstr(height-2, 0, str_msg)
+            screen.attroff(curses.color_pair(COLOR_MSG))
 
             key = screen.getch()
 
@@ -166,15 +188,12 @@ def display_msgs(screen, height, width):
     global MSG_R
     if not len(MSG_R):
         return None
-    #construct messages
-    messages = []
-    for m in MSG_R:
-        m = "[%s] %s: %s" % m
-        padd = " " * (width - (len(m) % width))
-        messages.append(m + padd)
+
+    messages = ["[%s] %s: %s" % m for m in MSG_R]
     last = len(messages) - 1
     first = last
     lines = 0
+    #calculate the number of msgs that can be printed
     while True:
         lines += ceil(len(messages[first]) / float(width))
         if lines > height:
@@ -184,8 +203,26 @@ def display_msgs(screen, height, width):
             break
         else:
             first -= 1
+    #printing messages
+    line = 0
+    for m in MSG_R[first:last + 1]:
+        user_time = "[%s] %s: " % m[:2]
+        msg = m[2]
+        padd = " " * (width - (len(msg + user_time) % width))
+        msg += padd
 
-    screen.addstr(0,0, "".join(messages[first:last + 1]))
+        screen.attron(curses.color_pair(COLOR_USERNAME))
+        screen.addstr(int(line), 0, user_time)
+        screen.attroff(curses.color_pair(COLOR_USERNAME))
+        #add lines if user_time longer than a line
+        line += len(user_time) / width
+        screen.addstr(int(line), len(user_time) % width, msg)
+        #add lines according to the size of msg and width
+        line += ceil(len(msg + user_time) / float(width))
+        #the previously added lines
+        line -= len(user_time) / width
+
+    #delete unused messages
     MSG_R = MSG_R[first:]
 
 
