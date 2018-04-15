@@ -3,7 +3,9 @@ Messaging is a client/server app written in Python2.7 that allows multiple users
 
 # How it works ?
 
-Add a descriptive picture here.
+The server handle multiple connection by creating a temporary thread that either create a new user or authenticate an old one, then add it to the users queue. A number of threads are running synchronously (the number is specified using a configuration variable. See the Usage section) to process messages sent by clients. This image illustrate the architecture of the app:
+
+![architecture](https://github.com/youben11/messaging/blob/master/architecture.jpg)
 
 # Installation
 
