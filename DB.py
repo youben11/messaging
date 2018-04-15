@@ -1,5 +1,5 @@
 import sqlite3
-from Crypto.Hash import SHA256
+from hashlib import sha256
 
 DB_NAME = "messaging.db"
 
@@ -20,7 +20,7 @@ class DB(object):
 
     def add_user(self, username, password):
         #hashing the password
-        h = SHA256.new()
+        h = sha256()
         h.update(password)
         password = h.hexdigest()
         #try to insert the user
@@ -34,7 +34,7 @@ class DB(object):
 
     def match_user(self, username, password):
         #hashing the password
-        h = SHA256.new()
+        h = sha256()
         h.update(password)
         password = h.hexdigest()
         #try to find the user
