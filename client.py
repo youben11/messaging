@@ -1,13 +1,13 @@
 import socket
 import time
 import re
-import signal
 import curses
 from sys import argv
 from threading import Thread
 from messaging_proto import *
 from Queue import Queue
 from string import printable
+from math import ceil
 
 
 HELP = """[+] Usage:
@@ -152,7 +152,7 @@ def start_curses(screen):
             str_msg = str_msg + " " * (width - 1 - len(str_msg))
 
             #displaying
-            display_msgs(screen, height, width)
+            display_msgs(screen, height - 2, width)
             screen.addstr(height-1, 0, str_status)
             screen.addstr(height-2, 0, str_msg)
 
@@ -162,9 +162,31 @@ def start_curses(screen):
             return None
 
 def display_msgs(screen, height, width):
-    #manage size
-    messages = ["[%s] %s: %s" % m for m in MSG_R]
-    screen.addstr(0,0, "\n".join(messages))
+    #bug: deal with long messages
+    global MSG_R
+    if not len(MSG_R):
+        return None
+    #construct messages
+    messages = []
+    for m in MSG_R:
+        m = "[%s] %s: %s" % m
+        padd = " " * (width - (len(m) % width))
+        messages.append(m + padd)
+    last = len(messages) - 1
+    first = last
+    lines = 0
+    while True:
+        lines += ceil(len(messages[first]) / float(width))
+        if lines > height:
+            first += 1
+            break
+        elif first == 0:
+            break
+        else:
+            first -= 1
+
+    screen.addstr(0,0, "".join(messages[first:last + 1]))
+    MSG_R = MSG_R[first:]
 
 
 if __name__ == "__main__":
