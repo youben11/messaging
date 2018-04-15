@@ -61,7 +61,7 @@ def add_user(client_sock, user_pass):
         db = DB()
         if db.add_user(username, password):
             client_sock.send(STATUS_SUCCESS)
-            print "[+] User %s created from %s:%d" % ((username,) + client_sock.getpeername())
+            print "[%d] User %s created from %s:%d" % ((time.time(), username) + client_sock.getpeername())
             CLIENTS.put(username)
             CLIENTS_SOCKETS[username] = client_sock
         else:
@@ -77,7 +77,7 @@ def login_user(client_sock, user_pass):
         db = DB()
         if db.match_user(username, password):
             client_sock.send(STATUS_SUCCESS)
-            print "[+] User %s is on %s:%d" % ((username,) + client_sock.getpeername())
+            print "[%d] User %s is on %s:%d" % ((time.time(), username) + client_sock.getpeername())
             CLIENTS.put(username)
             CLIENTS_SOCKETS[username] = client_sock
         else:
@@ -140,7 +140,7 @@ if __name__ == "__main__":
     while True:
         try:
             client_sock, client_addr = server.accept()
-            print "[+] Connection From %s:%d" % client_addr
+            print "[%d] Connection From %s:%d" % ((time.time(),) + client_addr)
             th = Thread(target=client_handler, args=(client_sock,))
             th.start()
         except socket.error:
