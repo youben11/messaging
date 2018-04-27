@@ -9,7 +9,7 @@ The server handle multiple connection by creating a temporary thread that either
 
 # Installation
 
-You only need to have Python2.7 installed to run the server and the curses module to run the client.
+You only need to have Python2.7 installed to run the server and the (ncurses)[https://en.wikipedia.org/wiki/Ncurses] library to run the client.
 
 Run the following command to get the code:
 ```bash
